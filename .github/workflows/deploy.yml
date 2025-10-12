@@ -44,17 +44,17 @@ jobs:
         with:
           registry: ${{ env.REGION }}-docker.pkg.dev
           username: _json_key
-          # 認証ステップの出力 (access_token) をパスワードとして直接渡す
+          # WIF認証で取得したトークンをパスワードとして直接渡す
           password: ${{ steps.auth.outputs.access_token }} 
 
-      # ⬇️ ステップ4: プッシュコマンドを公式アクションに置き換え ⬇️
+      # ⬇️ ステップ4: ビルドとプッシュを公式アクションに置き換え ⬇️
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE }}:${{ github.sha }}
-
+          
         
       # 5. バックエンド: Cloud Runデプロイ（Secret ManagerからDBパスワードを注入）
       - name: Deploy to Cloud Run
