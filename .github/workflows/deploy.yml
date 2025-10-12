@@ -1,18 +1,19 @@
-name: CI/CD to GCP and Firebase
+name: CI/CD to GCP
 
 on:
   push:
     branches:
       - main  # mainブランチへのPushをトリガーとする
 
-# GitHub Secretsで設定した値を参照
+# 環境変数 (GitHub Secretsで設定した値を参照)
 env:
+  # GCP/Cloud Runの設定
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   REGION: ${{ secrets.GCP_REGION }}
   SERVICE_ID: accounting-api
   AR_REPO: tutorial-myapp # Artifact Registryリポジトリ名
   IMAGE: accounting-app
-  # Cloud SQL接続名 (Secret Managerの注入はデプロイ時に行う)
+  # Cloud SQL接続名
   SQL_CONN: ${{ secrets.GCP_PROJECT_ID }}:${{ secrets.GCP_REGION }}:tutorial-myapp-database-setting
 
 jobs:
@@ -29,7 +30,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. GCP認証 (Workload Identity連携でSecretsなしにログイン)
+      # 2. GCP認証 (Workload Identity連携)
       - name: Authenticate to Google Cloud
         id: auth
         uses: google-github-actions/auth@v2
@@ -59,13 +60,13 @@ jobs:
             --set-secrets DB_PASS=DB_PASSWORD:latest
             --add-cloudsql-instances ${{ env.SQL_CONN }}
             --set-env-vars DB_USER=${{ env.DB_USER }},DB_NAME=${{ env.DB_NAME }}
-            
-      # 6. フロントエンド: Next.js環境セットアップ
+
+      # 6. フロントエンド: Node.js環境セットアップ
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20' 
-          cache: 'npm' # 依存関係のキャッシュ
+          cache: 'npm' 
 
       - name: Install Dependencies
         run: npm install
@@ -77,5 +78,6 @@ jobs:
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}' # GitHubが提供するトークン
-          firebaseServiceAccount: '${
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ steps.auth.outputs.service_account_email }}'
+          projectId: ${{ env.PROJECT_ID }}
