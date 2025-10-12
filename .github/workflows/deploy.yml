@@ -38,14 +38,15 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      # ⬇️ ステップ3: トークンの渡し方を変更 ⬇️
+      # ⬇️ ステップ3: トークンとユーザー名の参照を修正 ⬇️
       - name: Set up Docker access to AR (Direct Login)
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGION }}-docker.pkg.dev
-          username: ${{ steps.auth.outputs.service_account_email }} # ⬅️ ユーザー名はSAメールを使用
-          # トークンは、認証ステップが環境変数に書き出すGCPの資格情報ファイルを使用
-          password: ${{ steps.auth.outputs.access_token }} 
+          # ユーザー名にサービスアカウントのメールアドレスを使用 (WIFの標準)
+          username: ${{ steps.auth.outputs.service_account_email }} 
+          # パスワードに認証で取得したトークンを使用
+          password: ${{ steps.auth.outputs.access_token }}  
 
       # ⬇️ ステップ4: ビルドとプッシュを公式アクションに置き換え ⬇️
       - name: Build and Push Docker Image
