@@ -40,7 +40,7 @@ jobs:
 
       # 3. Docker認証 (Artifact Registryへのプッシュ準備)
       - name: Set up Docker access to AR
-        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev
+        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
 
 
       # 4. バックエンド: ビルドとプッシュ
