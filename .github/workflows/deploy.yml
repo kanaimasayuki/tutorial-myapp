@@ -23,7 +23,7 @@ jobs:
     # Workload Identity連携に必要な権限
     permissions:
       contents: 'read'
-      id-token: 'write' 
+      id-token: 'write'
 
     steps:
       # 1. コードのチェックアウト
