@@ -76,17 +76,17 @@ jobs:
       # 7. フロントエンド: ビルドと公開
       # 以前のアクションを削除し、新しいステップを追加
       - name: Deploy Frontend to Firebase Hosting
+        # 💡 run ブロックを修正し、認証情報を環境変数経由で渡す
         run: |
-          # 1. Firebase CLIをインストール (次のステップで必要)
+          # 1. Firebase CLIをインストール
           npm install -g firebase-tools
           
-          # 2. Firebaseにログイン (WIF認証情報を使うため、トークンは不要)
-          # GCloud認証情報（ステップ2で作成）が自動的に使われる
-          firebase use --add ${{ env.PROJECT_ID }} --token "${{ secrets.GITHUB_TOKEN }}"
+          # 2. Next.jsをビルド
+          npm run build
           
-          # 3. Hostingへデプロイ実行
-          # firebaseServiceAccountは不要。GCP認証が自動で借用される。
-          firebase deploy --only hosting --project ${{ env.PROJECT_ID }}
+          # 3. Hostingへデプロイ実行 (FIREBASE_TOKEN環境変数を使用)
+          # --token フラグを使い、WIFで取得したトークンを渡します。
+          firebase deploy --only hosting --project ${{ env.PROJECT_ID }} --token "${{ steps.auth.outputs.access_token }}"
         env:
           # Firebase CLIがGitHub Actions内で動作するために必要な環境変数
           # WIF認証で得たクレデンシャルが自動的に使われます
