@@ -38,9 +38,9 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      # # 3. Docker認証 (Artifact Registryへのプッシュ準備)
-      # - name: Set up Docker access to AR
-      #   run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
+      # 3. Docker認証 (Artifact Registryへのプッシュ準備)
+      - name: Set up Docker access to AR
+        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
 
       # # 4. バックエンド: ビルドとプッシュ
       # - name: Build and Push Docker Image
