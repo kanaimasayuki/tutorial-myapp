@@ -83,6 +83,7 @@ jobs:
           
           # 2. Next.jsをビルド
           npm run build
+          ls -F
           
           # 3. Hostingへデプロイ実行 (FIREBASE_TOKEN環境変数を使用)
           # --token フラグを使い、WIFで取得したトークンを渡します。
