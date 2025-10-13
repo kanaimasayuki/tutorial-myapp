@@ -73,18 +73,14 @@ jobs:
         run: npm install
 
 
-      # 7. フロントエンド: ビルドとFirebaseデプロイ
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          # 💡 repoTokenはそのまま (GitHubの内部的な操作に必要)
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           projectId: ${{ env.PROJECT_ID }}
-          # ❌ firebaseServiceAccount の行は完全に削除します。
-
-        env: # ⬅️ env ブロックを追加
-          # 💡 修正点: WIF認証で取得したアクセストークンをFIREBASE_TOKENとして渡す
-          FIREBASE_TOKEN: ${{ steps.auth.outputs.access_token }}
-      
+          
+          # ✅ これが最終的な正しい修正です。
+          firebaseServiceAccount: ${{ secrets.GCP_SERVICE_ACCOUNT }} 
+        
 
   
