@@ -77,14 +77,12 @@ jobs:
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
+          # ❌ firebaseServiceAccount の行を削除
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           projectId: ${{ env.PROJECT_ID }}
-          # 💡 firebaseServiceAccount は必須なので、Secretsで渡す
-          firebaseServiceAccount: ${{ secrets.GCP_SERVICE_ACCOUNT }} 
         
-        env: # ⬅️ env ブロックを追加
-          # 💡 WIF認証で取得したトークンをFIREBASE_TOKENとして渡す
-          #    （これがFirebase CLIに最優先で使われるべき認証情報となる）
+        env: # ⬅️ env ブロックに認証を集中
+          # 💡 WIF認証で取得したアクセストークンをFIREBASE_TOKENとして渡す
           FIREBASE_TOKEN: ${{ steps.auth.outputs.access_token }} 
         
 
