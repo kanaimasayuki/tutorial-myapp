@@ -38,46 +38,48 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      # 3. Docker認証 (Artifact Registryへのプッシュ準備)
-      - name: Set up Docker access to AR
-        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
+      # # 3. Docker認証 (Artifact Registryへのプッシュ準備)
+      # - name: Set up Docker access to AR
+      #   run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
 
-      # 4. バックエンド: ビルドとプッシュ
-      - name: Build and Push Docker Image
-        run: |
-          IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE }}:${{ github.sha }}
-          docker build --platform linux/amd64 -t $IMAGE_TAG .
-          docker push $IMAGE_TAG
+      # # 4. バックエンド: ビルドとプッシュ
+      # - name: Build and Push Docker Image
+      #   run: |
+      #     IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE }}:${{ github.sha }}
+      #     docker build --platform linux/amd64 -t $IMAGE_TAG .
+      #     docker push $IMAGE_TAG
         
-      # 5. バックエンド: Cloud Runデプロイ（Secret ManagerからDBパスワードを注入）
-      - name: Deploy to Cloud Run
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: ${{ env.SERVICE_ID }}
-          region: ${{ env.REGION }}
-          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE }}:${{ github.sha }}
-          flags: |
-            --set-secrets DB_PASS=DB_PASSWORD:latest
-            --add-cloudsql-instances ${{ env.SQL_CONN }}
-            --set-env-vars DB_USER=${{ env.DB_USER }},DB_NAME=${{ env.DB_NAME }}
+      # # 5. バックエンド: Cloud Runデプロイ（Secret ManagerからDBパスワードを注入）
+      # - name: Deploy to Cloud Run
+      #   uses: google-github-actions/deploy-cloudrun@v2
+      #   with:
+      #     service: ${{ env.SERVICE_ID }}
+      #     region: ${{ env.REGION }}
+      #     image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE }}:${{ github.sha }}
+      #     flags: |
+      #       --set-secrets DB_PASS=DB_PASSWORD:latest
+      #       --add-cloudsql-instances ${{ env.SQL_CONN }}
+      #       --set-env-vars DB_USER=${{ env.DB_USER }},DB_NAME=${{ env.DB_NAME }}
 
-      # 6. フロントエンド: Node.js環境セットアップ
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20' 
-          cache: 'npm' 
+      # # 6. フロントエンド: Node.js環境セットアップ
+      # - name: Set up Node.js
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     node-version: '20' 
+      #     cache: 'npm' 
 
-      - name: Install Dependencies
-        run: npm install
+      # - name: Install Dependencies
+      #   run: npm install
 
-      # 7. フロントエンド: ビルドとFirebaseデプロイ
-      - name: Build Next.js
-        run: npm run build
+      # # 7. フロントエンド: ビルドとFirebaseデプロイ
+      # - name: Build Next.js
+      #   run: npm run build
 
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ steps.auth.outputs.service_account_email }}'
-          projectId: ${{ env.PROJECT_ID }}
+      # - name: Deploy to Firebase Hosting
+      #   uses: FirebaseExtended/action-hosting-deploy@v0
+      #   with:
+      #     repoToken: '${{ secrets.GITHUB_TOKEN }}'
+      #     firebaseServiceAccount: '${{ steps.auth.outputs.service_account_email }}'
+      #     projectId: ${{ env.PROJECT_ID }}
+
+  
