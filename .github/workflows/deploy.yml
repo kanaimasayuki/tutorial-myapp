@@ -81,8 +81,7 @@ jobs:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           projectId: ${{ env.PROJECT_ID }}
 
-          # 👇 💡 修正点: WIF認証ステップの出力を渡す 💡
-          firebaseServiceAccount: ${{ steps.auth.outputs.service_account_email }}
+          firebaseServiceAccount: ${{ secrets.GCP_SERVICE_ACCOUNT }}
       
 
   
