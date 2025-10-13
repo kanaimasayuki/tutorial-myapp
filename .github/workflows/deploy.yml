@@ -72,15 +72,17 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      # 7. フロントエンド: ビルドとFirebaseデプロイ
-      - name: Build Next.js
-        run: npm run build
 
+      # 7. フロントエンド: ビルドとFirebaseデプロイ
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
+          # 👇 トークンとプロジェクトIDはそのまま
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ steps.auth.outputs.service_account_email }}'
           projectId: ${{ env.PROJECT_ID }}
+
+          # 👇 💡 修正点: WIF認証ステップの出力を渡す 💡
+          firebaseServiceAccount: ${{ steps.auth.outputs.service_account_email }}
+      
 
   
