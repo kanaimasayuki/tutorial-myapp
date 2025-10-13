@@ -40,14 +40,18 @@ jobs:
 
       # 3. Docker認証 (Artifact Registryへのプッシュ準備)
       - name: Set up Docker access to AR
-        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
-
-      # 4. バックエンド: ビルドとプッシュ
-      - name: Build and Push Docker Image
         run: |
+          gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
           IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE }}:${{ github.sha }}
           docker build --platform linux/amd64 -t $IMAGE_TAG .
           docker push $IMAGE_TAG
+
+      # # 4. バックエンド: ビルドとプッシュ
+      # - name: Build and Push Docker Image
+      #   run: |
+      #     IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE }}:${{ github.sha }}
+      #     docker build --platform linux/amd64 -t $IMAGE_TAG .
+      #     docker push $IMAGE_TAG
         
       # # 5. バックエンド: Cloud Runデプロイ（Secret ManagerからDBパスワードを注入）
       # - name: Deploy to Cloud Run
