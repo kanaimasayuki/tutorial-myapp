@@ -59,7 +59,7 @@ jobs:
           image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE }}:${{ github.sha }}
           flags: |
             --allow-unauthenticated
-            --set-secrets DB_PASS=DB_PASSWORD:latest
+            --set-secrets="DB_PASS=DB_PASSWORD:latest"
             --add-cloudsql-instances ${{ env.SQL_CONN }}
             --set-env-vars DB_USER=${{ secrets.DB_USER }},DB_NAME=${{ secrets.DB_NAME }},SQL_CONN=${{ env.SQL_CONN }}
       
