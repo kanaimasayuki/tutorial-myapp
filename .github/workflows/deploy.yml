@@ -89,7 +89,7 @@ jobs:
           # --token フラグを使い、WIFで取得したトークンを渡します。
           firebase deploy --only hosting --project ${{ env.PROJECT_ID }} --token "${{ steps.auth.outputs.access_token }}"
         env:
-          # Firebase CLIがGitHub Actions内で動作するために必要な環境変数
+          # Firebase CLIがGitHub Actions内で動作するために必要な環境変数.
           # WIF認証で得たクレデンシャルが自動的に使われます
           FIREBASE_CLI_PREVIEWS: hostingchannels
         
