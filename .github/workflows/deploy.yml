@@ -61,7 +61,7 @@ jobs:
             --allow-unauthenticated 
             --set-secrets DB_PASS=DB_PASSWORD:latest
             --add-cloudsql-instances ${{ env.SQL_CONN }}
-            --set-env-vars DB_USER=${{ env.DB_USER }},DB_NAME=${{ env.DB_NAME }}
+            --set-env-vars DB_USER=${{ secrets.DB_USER }},DB_NAME=${{ secrets.DB_NAME }}
 
       # 6. フロントエンド: Node.js環境セットアップ
       - name: Set up Node.js
@@ -94,5 +94,7 @@ jobs:
           # WIF認証で得たクレデンシャルが自動的に使われます
           FIREBASE_CLI_PREVIEWS: hostingchannels
         
+
+  
 
   
