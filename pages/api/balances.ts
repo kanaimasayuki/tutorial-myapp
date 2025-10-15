@@ -51,7 +51,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   } catch (error) {
     console.error('Database Error (Balances API):', error);
-    res.status(500).json({ message: '集計データの取得中にサーバーエラーが発生しました' });
+    res.status(500).json({ message: '集計データの取得中にサーバーエラーが発生しました'+dbConfig.host+dbConfig.user+dbConfig.password+dbConfig.database });
   } finally {
     await client.end();
   }

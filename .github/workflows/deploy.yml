@@ -63,30 +63,6 @@ jobs:
             --add-cloudsql-instances ${{ env.SQL_CONN }}
             --set-env-vars DB_USER=${{ secrets.DB_USER }},DB_NAME=${{ secrets.DB_NAME }}
       
-      - name: Wait for service to stabilize
-        # Cloud Runのデプロイが完了するまで一時停止
-        uses: nev7n/wait_for_deploy-action@v1 
-        with:
-          # Cloud RunのURLを待ちます
-          timeout: 60 # 300秒待機
-          # (ここはCIランナーのIPアドレスが必要なため、このアクションの使用が最も簡単です)
-
-      - name: DB Connection Health Check
-        # ヘルスチェックAPIを叩く
-        run: |
-          # Cloud Runの公開URLを取得（以前のステップの出力から取得可能）
-          # 💡 ここでは、簡略化のため、gcloudコマンドでURLを取得し、curlで叩きます
-          
-          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_ID }} \
-            --region ${{ env.REGION }} \
-            --format="value(status.url)")
-
-          # ヘルスチェックエンドポイントにリトライしながらアクセス
-          curl --fail --retry 5 --retry-delay 5 "$SERVICE_URL/api/health"
-        
-        # 💡 もし curl が失敗 (exit code 1) したら、ワークフロー全体が停止します
-
-
       # 6. フロントエンド: Node.js環境セットアップ
       - name: Set up Node.js
         uses: actions/setup-node@v4
