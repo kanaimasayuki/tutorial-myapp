@@ -10,10 +10,27 @@ const tableCellStyle = { padding: '10px', border: '1px solid #ddd', textAlign: '
 // 勘定科目別残高のデータ型
 interface BalanceItem {
   account_name: string;
+  account_type: string;
   total_debit: string;
   total_credit: string;
   balance: string;
 }
+
+// 勘定科目の種類の日本語表示
+const ACCOUNT_TYPE_LABELS: { [key: string]: string } = {
+  asset: '資産',
+  liability: '負債',
+  revenue: '収益',
+  expense: '費用',
+};
+
+// ホームポジションの表示
+const HOME_POSITION: { [key: string]: string } = {
+  asset: '借方',
+  liability: '貸方',
+  revenue: '貸方',
+  expense: '借方',
+};
 
 const JournalEntry: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -122,22 +139,31 @@ const JournalEntry: React.FC = () => {
         <thead>
           <tr>
             <th style={tableHeaderStyle}>勘定科目</th>
+            <th style={tableHeaderStyle}>種類</th>
+            <th style={tableHeaderStyle}>ホームポジション</th>
             <th style={tableHeaderStyle}>借方合計 (Dr)</th>
             <th style={tableHeaderStyle}>貸方合計 (Cr)</th>
             <th style={tableHeaderStyle}>残高</th>
           </tr>
         </thead>
         <tbody>
-          {balances.map((item) => (
-            <tr key={item.account_name}>
-              <td style={tableCellStyle}>{item.account_name}</td>
-              <td style={tableCellStyle}>{parseFloat(item.total_debit).toLocaleString()}</td>
-              <td style={tableCellStyle}>{parseFloat(item.total_credit).toLocaleString()}</td>
-              <td style={tableCellStyle as React.CSSProperties & { color: string }}>
-                {parseFloat(item.balance).toLocaleString()}
-              </td>
-            </tr>
-          ))}
+          {balances.map((item) => {
+            const balance = parseFloat(item.balance);
+            const balanceColor = balance >= 0 ? '#000' : '#d32f2f';
+            
+            return (
+              <tr key={item.account_name}>
+                <td style={tableCellStyle}>{item.account_name}</td>
+                <td style={tableCellStyle}>{ACCOUNT_TYPE_LABELS[item.account_type] || item.account_type}</td>
+                <td style={tableCellStyle}>{HOME_POSITION[item.account_type] || '-'}</td>
+                <td style={tableCellStyle}>{parseFloat(item.total_debit).toLocaleString()}</td>
+                <td style={tableCellStyle}>{parseFloat(item.total_credit).toLocaleString()}</td>
+                <td style={{ ...tableCellStyle, color: balanceColor, fontWeight: 'bold' }}>
+                  {balance.toLocaleString()}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
