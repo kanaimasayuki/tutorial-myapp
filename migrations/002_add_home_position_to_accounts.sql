@@ -8,7 +8,7 @@ ALTER TABLE accounts
 UPDATE accounts
 SET home_position =
   CASE
-    WHEN LOWER(type) IN ('revenue','income','liability','equity') THEN 'credit'
+    WHEN name IN ('revenue','income','liability','equity') THEN 'credit'
     ELSE 'debit'
   END
 WHERE home_position IS NULL OR home_position = '';
