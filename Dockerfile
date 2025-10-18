@@ -22,9 +22,9 @@ RUN npm ci --prefer-offline
 COPY . .
 
 # Next.jsアプリケーションのビルド
-RUN npm run build 
-# もし yarn を使っている場合は ↓ に変更
-# RUN yarn build
+RUN npm run build
+# 静的エクスポートが必要なら次を追加
+RUN npm run export
 
 
 # ----------------------------------------
