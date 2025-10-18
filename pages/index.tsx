@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
 
+// 追加: API の型定義
+type ApiBalance = {
+  account_name: string;
+  debit_total?: number | string;
+  credit_total?: number | string;
+  home_signed_balance?: number | string;
+  total_debit?: number | string;
+  total_credit?: number | string;
+  balance?: number | string;
+  raw_balance?: number | string;
+};
+
+type JournalResponse = { journalId?: number | string; message?: string; error?: string };
+
 // 簡略化のため勘定科目を固定 (DBのaccountsテーブルにある名前に合わせる)
 const ACCOUNTS = ['現金', '売上', '売掛金', '買掛金', '消耗品費', '給料手当'];
 
@@ -34,7 +48,7 @@ const JournalEntry: React.FC = () => {
     try {
       const response = await fetch('/api/balances'); // /api/balances に GET リクエスト
       if (response.ok) {
-        const apiData: any[] = await response.json();
+        const apiData: ApiBalance[] = await response.json();
         // APIのフィールド名(debit_total, credit_total, home_signed_balance)を
         // フロントが期待する形にマップする
         const data: BalanceItem[] = apiData.map((it) => ({
@@ -47,7 +61,8 @@ const JournalEntry: React.FC = () => {
       } else {
         setMessage('❌ 集計データの取得に失敗しました。Cloud Runログを確認してください。');
       }
-    } catch (error) {
+    } catch (err) {
+      console.error('[fetchBalances] error', err);
       setMessage('❌ ネットワークエラーにより集計データが取得できませんでした。');
     } finally {
       setLoading(false);
@@ -64,7 +79,7 @@ const JournalEntry: React.FC = () => {
   };
 
   // API送信を安全に行うユーティリティ
-  async function submitJournal(body: any, onSuccess?: (data: any) => void) {
+  async function submitJournal(body: Record<string, unknown>, onSuccess?: (data: JournalResponse) => void) {
     try {
       const res = await fetch('/api/journal', {
         method: 'POST',
@@ -75,8 +90,8 @@ const JournalEntry: React.FC = () => {
 
       const text = await res.text();
       console.log('[journal] response text=', text);
-      let data = null;
-      try { data = text ? JSON.parse(text) : null; } catch (e) {
+      let data: JournalResponse | null = null;
+      try { data = text ? (JSON.parse(text) as JournalResponse) : null; } catch (e) {
         console.error('[journal] JSON parse error', e);
         throw new Error('Invalid JSON response from server');
       }
@@ -88,11 +103,10 @@ const JournalEntry: React.FC = () => {
       }
 
       console.log('[journal] success', data);
-      if (onSuccess) onSuccess(data);
+      if (onSuccess) onSuccess(data ?? {});
       return data;
     } catch (err) {
       console.error('[journal] submit error', err);
-      // 呼び出し側が catch してUIで表示できるようエラーを投げる
       throw err;
     }
   }
@@ -116,8 +130,10 @@ const JournalEntry: React.FC = () => {
       setMessage('✅ 登録成功！仕訳ID: ' + (data?.journalId ?? ''));
       setFormData(prev => ({ ...prev, amount: '', description: '' })); 
       // 成功したら集計データを再ロード
-    } catch (err: any) {
-      setMessage('❌ 登録失敗: ' + (err?.message ?? String(err)));
+    } catch (err) {
+      console.error('[handleSubmit] error', err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setMessage('❌ 登録失敗: ' + msg);
     }
   };
 
