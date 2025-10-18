@@ -19,7 +19,11 @@ async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
     await client.connect();
     return await fn(client);
   } finally {
-    try { await client.end(); } catch (e) { console.error('pg end error', e); }
+    try {
+      await client.end();
+    } catch (e: unknown) {
+      console.error('pg end error', e);
+    }
   }
 }
 
@@ -66,16 +70,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         await client.query('COMMIT');
         return { journalId };
-      } catch (e: any) {
-        try { await client.query('ROLLBACK'); } catch (_) {}
+      } catch (e: unknown) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackErr: unknown) {
+          console.error('rollback error', rollbackErr);
+        }
         throw e;
       }
     });
 
     return res.status(200).json({ message: '仕訳登録成功', journalId: result.journalId ?? result.journalId });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Database Error (Journal API):', err);
-    if (err && typeof err.status === 'number') return res.status(err.status).json({ message: err.message });
+    if (typeof err === 'object' && err !== null) {
+      const e = err as { status?: number; message?: string };
+      if (typeof e.status === 'number') return res.status(e.status).json({ message: e.message ?? 'error' });
+    }
     return res.status(500).json({ message: '仕訳登録中にサーバーエラーが発生しました。' });
   }
 }

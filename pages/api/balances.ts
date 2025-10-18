@@ -4,6 +4,18 @@ import { Client, types } from 'pg';
 // PostgreSQL の NUMERIC を number に変換している場合は既にある想定
 types.setTypeParser(1700, (val: string | null) => (val === null ? null : parseFloat(val)));
 
+type BalanceRow = {
+  account_id: number;
+  code: string | null;
+  account_name: string;
+  type: string | null;
+  home_position: 'debit' | 'credit' | null;
+  debit_total: number | null;
+  credit_total: number | null;
+  raw_balance: number | null;
+  home_signed_balance: number | null;
+};
+
 function getDbHost(): string {
   const sqlConn = process.env.SQL_CONN?.trim() ?? 'localhost';
   if (sqlConn.startsWith('/') || sqlConn.startsWith('/cloudsql')) return sqlConn;
@@ -82,8 +94,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log('[balances] running query');
       const r = await client.query(q);
       console.log('[balances] query returned rows count=', Array.isArray(r.rows) ? r.rows.length : 'unknown');
-      // 既存のマッピング処理をここに置く
-      return r.rows.map((row: any) => ({
+      return r.rows.map((row: BalanceRow) => ({
         ...row,
         debit_total: row.debit_total === null ? 0 : Number(row.debit_total),
         credit_total: row.credit_total === null ? 0 : Number(row.credit_total),
@@ -93,7 +104,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     return res.status(200).json(rows);
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('[balances] handler error', err);
     return res.status(500).json({ error: 'internal_error' });
   }
