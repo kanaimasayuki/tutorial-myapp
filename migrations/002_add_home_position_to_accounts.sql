@@ -13,5 +13,12 @@ SET home_position =
   END
 WHERE home_position IS NULL OR home_position = '';
 
--- （オプション）制約のために NOT NULL が既に付与されている想定だが、
--- もし既存行に NULL があるなら上の UPDATE を先に実行してください。
+-- 3) 制約付与（値の検証とNOT NULL化）
+ALTER TABLE accounts
+  ALTER COLUMN home_position SET NOT NULL;
+
+ALTER TABLE accounts
+  ADD CONSTRAINT accounts_home_position_check
+    CHECK (home_position IN ('debit','credit'));
+
+COMMIT;
