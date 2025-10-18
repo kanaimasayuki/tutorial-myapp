@@ -1,4 +1,4 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { Client } from 'pg';
 
 // DB接続設定（環境変数を使用）
@@ -9,50 +9,74 @@ const dbConfig = {
   database: process.env.DB_NAME,
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ message: 'Method Not Allowed' });
-  }
+function getDbHost(): string {
+  const sqlConn = process.env.SQL_CONN?.trim() ?? 'localhost';
+  if (sqlConn.startsWith('/') || sqlConn.startsWith('/cloudsql')) return sqlConn;
+  if (sqlConn.includes(':')) return `/cloudsql/${sqlConn}`;
+  return sqlConn;
+}
 
-  const client = new Client(dbConfig);
-
+async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
+  const client = new Client({
+    host: getDbHost(),
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    database: process.env.DB_NAME,
+  });
   try {
     await client.connect();
-
-    // 全ての仕訳を集計し、勘定科目ごとの合計額を計算するSQL
-    const query = `
-      WITH DR_CR_AGG AS (
-        -- 借方 (Debit) の合計
-        SELECT debit_account_id AS account_id, SUM(amount) AS debit_total, 0 AS credit_total
-        FROM journals
-        GROUP BY debit_account_id
-        
-        UNION ALL
-        
-        -- 貸方 (Credit) の合計
-        SELECT credit_account_id AS account_id, 0 AS debit_total, SUM(amount) AS credit_total
-        FROM journals
-        GROUP BY credit_account_id
-      )
-      SELECT 
-        a.name AS account_name,
-        COALESCE(SUM(dca.debit_total), 0) AS total_debit,
-        COALESCE(SUM(dca.credit_total), 0) AS total_credit,
-        (COALESCE(SUM(dca.debit_total), 0) - COALESCE(SUM(dca.credit_total), 0)) AS balance
-      FROM accounts a
-      LEFT JOIN DR_CR_AGG dca ON a.id = dca.account_id
-      GROUP BY a.name
-      ORDER BY a.name;
-    `;
-    
-    const result = await client.query(query);
-
-    res.status(200).json(result.rows);
-
-  } catch (error) {
-    console.error('Database Error (Balances API):', error);
-    res.status(500).json({ message: '集計データの取得中にサーバーエラーが発生しました'});
+    return await fn(client);
   } finally {
-    await client.end();
+    try { await client.end(); } catch (e) { console.error('pg end error', e); }
+  }
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', ['GET']);
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
+  }
+
+  try {
+    const rows = await withClient(async (client) => {
+      const q = `
+        SELECT
+          a.id AS account_id,
+          a.code,
+          a.name AS account_name,
+          a.type,
+          a.home_position,
+          COALESCE(SUM(CASE WHEN je.position = 'debit' THEN je.amount ELSE 0 END), 0) AS debit_total,
+          COALESCE(SUM(CASE WHEN je.position = 'credit' THEN je.amount ELSE 0 END), 0) AS credit_total,
+          -- raw_balance: debit - credit (positive => debit balance, negative => credit balance)
+          (COALESCE(SUM(CASE WHEN je.position = 'debit' THEN je.amount ELSE 0 END),0)
+           - COALESCE(SUM(CASE WHEN je.position = 'credit' THEN je.amount ELSE 0 END),0)
+          ) AS raw_balance,
+          CASE
+            WHEN COALESCE(SUM(CASE WHEN je.position = 'debit' THEN je.amount ELSE 0 END),0)
+                 >= COALESCE(SUM(CASE WHEN je.position = 'credit' THEN je.amount ELSE 0 END),0)
+            THEN 'debit' ELSE 'credit' END AS balance_position,
+          -- home_signed_balance: 科目の home_position 基準で符号付けした残高（常に正の値がホーム側、負は反対側）
+          CASE
+            WHEN a.home_position = 'debit' THEN
+              (COALESCE(SUM(CASE WHEN je.position = 'debit' THEN je.amount ELSE 0 END),0)
+               - COALESCE(SUM(CASE WHEN je.position = 'credit' THEN je.amount ELSE 0 END),0))
+            ELSE
+              (COALESCE(SUM(CASE WHEN je.position = 'credit' THEN je.amount ELSE 0 END),0)
+               - COALESCE(SUM(CASE WHEN je.position = 'debit' THEN je.amount ELSE 0 END),0))
+          END AS home_signed_balance
+        FROM accounts a
+        LEFT JOIN journal_entries je ON je.account_id = a.id
+        GROUP BY a.id, a.code, a.name, a.type, a.home_position
+        ORDER BY a.code NULLS LAST, a.id;
+      `;
+      const r = await client.query(q);
+      return r.rows;
+    });
+
+    return res.status(200).json(rows);
+  } catch (err) {
+    console.error('Fetch balances error', err);
+    return res.status(500).json({ error: 'internal_error' });
   }
 }
