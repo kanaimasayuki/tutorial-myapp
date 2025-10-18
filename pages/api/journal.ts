@@ -1,55 +1,81 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Client } from 'pg';
 
-// DB接続設定（環境変数を使用）
-const dbConfig = {
-  host: `/cloudsql/${process.env.SQL_CONN}`, 
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS, // Secret Managerから注入
-  database: process.env.DB_NAME,
-};
+function getDbHost() {
+  const sqlConn = (process.env.SQL_CONN || 'localhost').trim();
+  if (sqlConn.startsWith('/') || sqlConn.startsWith('/cloudsql')) return sqlConn;
+  if (sqlConn.includes(':')) return `/cloudsql/${sqlConn}`;
+  return sqlConn;
+}
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method Not Allowed' });
-  }
-
-  const { date, debit_name, credit_name, amount, description } = req.body;
-  
-  const client = new Client(dbConfig);
-
+async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
+  const client = new Client({
+    host: getDbHost(),
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    database: process.env.DB_NAME,
+  });
   try {
     await client.connect();
+    return await fn(client);
+  } finally {
+    try { await client.end(); } catch (e) { console.error('pg end error', e); }
+  }
+}
 
-    // 1. 勘定科目IDを取得
-    const getAccountIdQuery = 'SELECT id FROM accounts WHERE name = $1';
-    const debitResult = await client.query(getAccountIdQuery, [debit_name]);
-    const creditResult = await client.query(getAccountIdQuery, [credit_name]);
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
 
-    if (debitResult.rows.length === 0 || creditResult.rows.length === 0) {
-      return res.status(400).json({ message: '無効な勘定科目が指定されました。DB設定を確認してください。' });
-    }
+  const { date, debit_name, credit_name, amount, description } = req.body ?? {};
 
-    const debitId = debitResult.rows[0].id;
-    const creditId = creditResult.rows[0].id;
+  if (!date || !debit_name || !credit_name || !amount) {
+    return res.status(400).json({ message: 'date, debit_name, credit_name, amount are required' });
+  }
+  const amt = Number(amount);
+  if (!Number.isFinite(amt) || amt <= 0) {
+    return res.status(400).json({ message: 'amount must be a positive number' });
+  }
 
-    // 2. 仕訳を登録
-    const insertQuery = `
-      INSERT INTO journals (date, debit_account_id, credit_account_id, amount, description)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *;
-    `;
-    const result = await client.query(insertQuery, [date, debitId, creditId, amount, description]);
+  try {
+    const result = await withClient(async (client) => {
+      try {
+        await client.query('BEGIN');
 
-    res.status(200).json({ 
-        message: '仕訳登録成功',
-        journal: result.rows[0] 
+        // 勘定科目ID取得
+        const getAccountIdQuery = 'SELECT id FROM accounts WHERE name = $1';
+        const debitRes = await client.query(getAccountIdQuery, [debit_name]);
+        const creditRes = await client.query(getAccountIdQuery, [credit_name]);
+        if (debitRes.rows.length === 0 || creditRes.rows.length === 0) {
+          await client.query('ROLLBACK');
+          throw { status: 400, message: '無効な勘定科目が指定されました' };
+        }
+        const debitId = debitRes.rows[0].id;
+        const creditId = creditRes.rows[0].id;
+
+        // journals にヘッダを挿入（schema: posted_at, description）
+        const insertJournalQ = `INSERT INTO journals (posted_at, description, created_at, updated_at)
+                                VALUES ($1, $2, now(), now()) RETURNING id`;
+        const jr = await client.query(insertJournalQ, [date, description ?? null]);
+        const journalId = jr.rows[0].id;
+
+        // journal_entries に借方/貸方行を挿入
+        const insertEntryQ = `INSERT INTO journal_entries (journal_id, account_id, amount, position, created_at, updated_at)
+                              VALUES ($1, $2, $3, $4, now(), now())`;
+        await client.query(insertEntryQ, [journalId, debitId, amt, 'debit']);
+        await client.query(insertEntryQ, [journalId, creditId, amt, 'credit']);
+
+        await client.query('COMMIT');
+        return { journalId };
+      } catch (e: any) {
+        try { await client.query('ROLLBACK'); } catch (_) {}
+        throw e;
+      }
     });
 
-  } catch (error) {
-    console.error('Database Error (Journal API):', error);
-    res.status(500).json({ message: '仕訳登録中にサーバーエラーが発生しました。' });
-  } finally {
-    await client.end();
+    return res.status(200).json({ message: '仕訳登録成功', journalId: result.journalId ?? result.journalId });
+  } catch (err: any) {
+    console.error('Database Error (Journal API):', err);
+    if (err && typeof err.status === 'number') return res.status(err.status).json({ message: err.message });
+    return res.status(500).json({ message: '仕訳登録中にサーバーエラーが発生しました。' });
   }
 }

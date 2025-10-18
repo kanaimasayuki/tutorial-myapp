@@ -10,9 +10,10 @@ const tableCellStyle = { padding: '10px', border: '1px solid #ddd', textAlign: '
 // 勘定科目別残高のデータ型
 interface BalanceItem {
   account_name: string;
-  total_debit: string;
-  total_credit: string;
-  balance: string;
+  // API側は number を返すので数値または文字列を許容
+  total_debit: number | string;
+  total_credit: number | string;
+  balance: number | string;
 }
 
 const JournalEntry: React.FC = () => {
@@ -33,7 +34,15 @@ const JournalEntry: React.FC = () => {
     try {
       const response = await fetch('/api/balances'); // /api/balances に GET リクエスト
       if (response.ok) {
-        const data: BalanceItem[] = await response.json();
+        const apiData: any[] = await response.json();
+        // APIのフィールド名(debit_total, credit_total, home_signed_balance)を
+        // フロントが期待する形にマップする
+        const data: BalanceItem[] = apiData.map((it) => ({
+          account_name: it.account_name ?? it.accountName ?? '',
+          total_debit: it.debit_total ?? it.total_debit ?? 0,
+          total_credit: it.credit_total ?? it.total_credit ?? 0,
+          balance: it.home_signed_balance ?? it.balance ?? it.raw_balance ?? 0,
+        }));
         setBalances(data);
       } else {
         setMessage('❌ 集計データの取得に失敗しました。Cloud Runログを確認してください。');
@@ -54,30 +63,85 @@ const JournalEntry: React.FC = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // API送信を安全に行うユーティリティ
+  async function submitJournal(body: any, onSuccess?: (data: any) => void) {
+    try {
+      const res = await fetch('/api/journal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      console.log('[journal] fetch done status=', res.status, res.statusText);
+
+      const text = await res.text();
+      console.log('[journal] response text=', text);
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (e) {
+        console.error('[journal] JSON parse error', e);
+        throw new Error('Invalid JSON response from server');
+      }
+
+      if (!res.ok) {
+        // サーバーからのエラーメッセージがあればそれを投げる
+        const msg = data?.message ?? data?.error ?? JSON.stringify(data);
+        throw new Error(msg || 'server_error');
+      }
+
+      console.log('[journal] success', data);
+      if (onSuccess) onSuccess(data);
+      return data;
+    } catch (err) {
+      console.error('[journal] submit error', err);
+      // 呼び出し側が catch してUIで表示できるようエラーを投げる
+      throw err;
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage('登録中...');
 
+    const body = {
+      date: formData.date,
+      debit_name: formData.debit_name,
+      credit_name: formData.credit_name,
+      amount: formData.amount,
+      description: formData.description,
+    };
     try {
-      // 仕訳登録APIに POST リクエスト
-      const response = await fetch('/api/journal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+      const data = await submitJournal(body, () => {
+        // 成功時の処理: 残高再取得等
+        fetchBalances();
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setMessage(`✅ 登録成功！仕訳ID: ${data.journal.id}`);
-        setFormData(prev => ({ ...prev, amount: '', description: '' })); 
-        fetchBalances(); // 成功したら集計データを再ロード
-      } else {
-        setMessage(`❌ 登録失敗: ${data.message}`);
-      }
-    } catch (error) {
-      setMessage(`❌ ネットワークエラー。コンソールとCloud Runログを確認してください。`);
+      setMessage('✅ 登録成功！仕訳ID: ' + (data?.journalId ?? ''));
+      setFormData(prev => ({ ...prev, amount: '', description: '' })); 
+      // 成功したら集計データを再ロード
+    } catch (err: any) {
+      setMessage('❌ 登録失敗: ' + (err?.message ?? String(err)));
     }
+  };
+
+  // safe amount formatter（コンポーネント内か共通ユーティリティに入れてください）
+  const fmtAmount = (v: unknown, opts?: { minFraction?: number; maxFraction?: number }) => {
+    // null/undefined -> 0 として扱う（必要なら '-' に変える）
+    if (v === null || v === undefined) return '0';
+
+    // 数字や数値文字列を正規化して parseFloat へ
+    if (typeof v === 'number') {
+      if (!Number.isFinite(v)) return '0';
+      return v.toLocaleString(undefined, { minimumFractionDigits: opts?.minFraction ?? 0, maximumFractionDigits: opts?.maxFraction ?? 2 });
+    }
+
+    // 文字列の場合、数字以外の全角スペースや改行などを除去してから数値化
+    if (typeof v === 'string') {
+      const normalized = v.replace(/[^\d\-.,eE]/g, '').replace(/,/g, '');
+      const n = parseFloat(normalized);
+      if (!Number.isFinite(n)) return '0';
+      return n.toLocaleString(undefined, { minimumFractionDigits: opts?.minFraction ?? 0, maximumFractionDigits: opts?.maxFraction ?? 2 });
+    }
+
+    // その他型は一律 '0'
+    return '0';
   };
 
   return (
@@ -131,10 +195,10 @@ const JournalEntry: React.FC = () => {
           {balances.map((item) => (
             <tr key={item.account_name}>
               <td style={tableCellStyle}>{item.account_name}</td>
-              <td style={tableCellStyle}>{parseFloat(item.total_debit).toLocaleString()}</td>
-              <td style={tableCellStyle}>{parseFloat(item.total_credit).toLocaleString()}</td>
+              <td style={tableCellStyle}>{fmtAmount(item.total_debit)}</td>
+              <td style={tableCellStyle}>{fmtAmount(item.total_credit)}</td>
               <td style={tableCellStyle as React.CSSProperties & { color: string }}>
-                {parseFloat(item.balance).toLocaleString()}
+                {fmtAmount(item.balance)}
               </td>
             </tr>
           ))}
