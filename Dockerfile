@@ -22,9 +22,9 @@ RUN npm ci --prefer-offline
 COPY . .
 
 # Next.jsアプリケーションのビルド
+ENV STATIC_EXPORT=true
 RUN npm run build
-# 静的エクスポートが必要なら次を追加
-RUN npm run export
+# export ステップは不要（next.config.ts が output: 'export' を返すため）
 
 
 # ----------------------------------------
