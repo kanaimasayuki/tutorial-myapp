@@ -18,4 +18,12 @@ DB_NAME=your_db_name
 
 # マイグレーション実行（gcloud が Cloud Shell にプリインストールされており、
 # 現在のプロジェクトが正しく設定されている前提）
-gcloud sql connect $INSTANCE_NAME --user=$DB_USER --database=$DB_NAME < migrations/002_add_home_position_to_accounts.sql
+gcloud sql connect $INSTANCE_NAME --user=$DB_USER --database=$DB_NAME < <(cat migrations/*.sql)
+
+
+# GCP上でテーブルを操作するとき
+DB_USER=app_user
+DB_NAME=account_db
+NSTANCE_NAME=tutorial-myapp-database-setting
+gcloud sql connect $INSTANCE_NAME --user=$DB_USER --database=$DB_NAME
+3968-Kokusho
