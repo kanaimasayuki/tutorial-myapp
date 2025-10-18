@@ -117,3 +117,43 @@ GitHub Actionsがトリガーされ、ビルド、Artifact Registryへのプッ�
 CI/CDが成功した後、アプリケーションは以下のURLで公開されます。
 
 **Hosting URL**: https://\[YOUR\_PROJECT\_ID\].web.app
+
+
+
+初期データベーススキーマの作成
+DB接続後、仕訳に必要なテーブルと初期データを設定します。
+
+```
+# 接続コマンド (Cloud Shellで実行)
+gcloud sql connect tutorial-myapp-database-setting --user=app_user --database=account_db
+
+# 接続後、以下のSQLを実行:
+-- 1. 勘定科目（マスタ）テーブルの作成
+CREATE TABLE IF NOT EXISTS accounts (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL
+);
+
+-- 2. 仕訳トランザクション（ジャーナル）テーブルの作成
+CREATE TABLE IF NOT EXISTS journals (
+    id SERIAL PRIMARY KEY,
+    date DATE NOT NULL,
+    debit_account_id INTEGER REFERENCES accounts(id) NOT NULL,
+    credit_account_id INTEGER REFERENCES accounts(id) NOT NULL,
+    amount NUMERIC(15, 2) NOT NULL CHECK (amount > 0),
+    description TEXT
+);
+
+-- 3. 初期データの投入 (アプリケーションのプルダウンで使用する科目)
+INSERT INTO accounts (name) VALUES 
+    ('現金'), 
+    ('売上'), 
+    ('買掛金'), 
+    ('売掛金'), 
+    ('消耗品費'), 
+    ('給料手当') 
+ON CONFLICT (name) DO NOTHING;
+
+\q
+```
+
