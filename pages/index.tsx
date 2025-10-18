@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 // 追加: API の型定義
 type ApiBalance = {
   account_name: string;
+  accountName?: string; // ← 追加: サーバー側の別名を許容
   debit_total?: number | string;
   credit_total?: number | string;
   home_signed_balance?: number | string;
